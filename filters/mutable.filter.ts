@@ -40,16 +40,18 @@ export class MutableFilter implements Filter {
 
       const deserialize = this.metadataSerializer.deserialize(metadataAccount.data);
       const mutable = !this.checkMutable || deserialize[0].isMutable;
-      const hasSocials = !this.checkSocials || (await this.hasSocials(deserialize[0]));
-      const ok = !mutable && hasSocials;
+      const socials = this.checkSocials ? await this.getSocialTypes(deserialize[0]) : [];
+      const ok = !mutable && socials.length > 0;
       const message: string[] = [];
 
       if (mutable) {
         message.push('metadata can be changed');
       }
 
-      if (!hasSocials) {
+      if (socials.length === 0) {
         message.push('has no socials');
+      } else {
+        message.push(`has socials: ${socials.join(', ')}`);
       }
 
       const result = { ok: ok, message: ok ? undefined : `MutableSocials -> Token ${message.join(' and ')}` };
@@ -69,9 +71,23 @@ export class MutableFilter implements Filter {
     };
   }
 
-  private async hasSocials(metadata: MetadataAccountData) {
+  private async getSocialTypes(metadata: MetadataAccountData): Promise<string[]> {
     const response = await fetch(metadata.uri);
     const data = await response.json();
-    return Object.values(data?.extensions ?? {}).filter((value: any) => value).length > 0;
+    const socialTypes: string[] = [];
+
+    if (data?.extensions) {
+      if (data.extensions.website) {
+        socialTypes.push('web');
+      }
+      if (data.extensions.twitter) {
+        socialTypes.push('twitter');
+      }
+      if (data.extensions.telegram) {
+        socialTypes.push('telegram');
+      }
+    }
+
+    return socialTypes;
   }
 }
